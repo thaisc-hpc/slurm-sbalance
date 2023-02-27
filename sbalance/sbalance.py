@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-# Copyright (c) 2019 Putt Sakdhnagool <putt.sakdhnagool@nectec.or.th>,
+# Copyright (c) 2019-2023 Putt Sakdhnagool <putt.sakdhnagool@nectec.or.th>,
 #
 # sbalance: query remaining slurm billing balance
 from __future__ import print_function
@@ -14,16 +14,17 @@ import sys
 
 from io import StringIO
 
-import numpy as np
-import pandas as pd
-
 from .config import __version__, __author__, __license__, SACCT_BEGIN_DATE
 
-Verbosity = type('Verbosity', (), {'INFO':1, 'WARNING':2, 'DEBUG':5})
+Verbosity = type('Verbosity', (), {'INFO':1, 'WARNING':2, 'DEBUG':5, 'DEBUG2':6})
 
 DEBUG = False
 
-SACCT_COMMAND = 'sacct'
+SU_FACTOR = 60
+
+SINFO_CMD = 'sinfo'
+
+SACCT_CLI = 'sacct'
 SACCT_USAGE_FIELDS = ('jobid', 'user', 'account','qos','state','alloctres','elapsedraw','partition')
 SACCT_USAGE_STATES = ('CD',     # COMPLETED
                       'F',      # FAILED
@@ -31,15 +32,17 @@ SACCT_USAGE_STATES = ('CD',     # COMPLETED
                       'CA'      # CANCEL
 )
 
-SACCTMGR_COMMAND = 'sacctmgr'
+SACCTMGR_CLI = 'sacctmgr'
 SACCTMGR_QOS_FIELDS = ('name','grptresmins','flags','description')
 SACCTMGR_QOS_NODECAY_FLAG = 'NoDecay'
 SACCTMGR_ASSOC_FIELDS = ('account','user','qos', 'defaultqos')
 
+SCONTROL_CLI = 'scontrol'
+
 __verbose_print = None
 
 def parse_args():
-    slurm_version = str(subprocess.check_output(['sshare', '--version']).decode())
+    slurm_version = str(subprocess.check_output([SINFO_CMD, '--version']).decode())
 
     parser = argparse.ArgumentParser(prog='sbalance', description='Query slurm account balance.')
     version = "sbalance " + __version__ + " with " + slurm_version
@@ -72,13 +75,133 @@ def parse_args():
 
     return parser.parse_args()
 
+def get_slurm_qos() -> dict:
+    """get_slurm_qos returns a dictionary containing QoS data."""
+    qos_cmd = [SACCTMGR_CLI,'show', 'qos','-P',
+               'format=' + ','.join(SACCTMGR_QOS_FIELDS)
+    ]
+    __verbose_print("QoS command: " + ' '.join(qos_cmd), level=Verbosity.DEBUG)
+
+    qos_output_raw = subprocess.check_output(qos_cmd).decode('utf-8')
+    __verbose_print("QoS output:\n" + qos_output_raw, level=Verbosity.DEBUG2)
+
+    qos_csv = csv.DictReader(StringIO(qos_output_raw),delimiter='|')
+    qos = dict()
+    for row in qos_csv:
+        if row['Flags'] == SACCTMGR_QOS_NODECAY_FLAG:
+            grp_tres = row['GrpTRESMins'].split(',')
+            res_dict = dict()
+            for res in grp_tres:
+                r = res.split('=')
+                if len(r) == 2:
+                    if r[0] == 'billing':
+                        res_dict[r[0]] = int(r[1])
+                    else:
+                        res_dict[r[0]] = r[1]
+            row['GrpTRESMins'] = res_dict
+            qos[row['Name']] = row
+    __verbose_print(qos, level=Verbosity.DEBUG2)
+
+    return qos
+
+def get_slurm_default_qos() -> set:
+    """get_slurm_default_qos returns a set of defualt QoS visible by the user"""
+    assoc_cmd = [SACCTMGR_CLI,
+                   'show', 'assoc','-P',
+                   'format=' + ','.join(SACCTMGR_ASSOC_FIELDS)
+    ]
+    __verbose_print("Assoc command: " + ' '.join(assoc_cmd), level=Verbosity.DEBUG)
+
+    assoc_output_raw = subprocess.check_output(assoc_cmd).decode('utf-8')
+    __verbose_print("Assoc output:\n" + assoc_output_raw, level=Verbosity.DEBUG2)
+
+    assoc_csv = csv.DictReader(StringIO(assoc_output_raw),delimiter='|')
+
+    # Assume defautl QoS is used for accounting 
+    account_set = set()
+    for row in assoc_csv:
+        if row['Def QOS'] != '' and row['User'] != '':
+            account_set.add(row['Def QOS'])
+    __verbose_print("Accounts: " + ','.join(account_set), level=Verbosity.INFO)
+
+    return account_set
+
+def get_slurm_usage(qos_list:list) -> list:
+    """get_slurm_usage returns a list of dictionaries containing usage information for each QoS in `qos_list`"""
+
+    usage_cmd = [SCONTROL_CLI,'show', 'assoc','qos='+','.join(qos_list), '-o']
+    __verbose_print("Usage command: " + ' '.join(usage_cmd), level=Verbosity.DEBUG)
+
+    usage_output_raw = subprocess.check_output(usage_cmd).decode('utf-8')
+
+    lines = usage_output_raw.strip().split('\n')
+    __verbose_print("Usage output:", level=Verbosity.DEBUG2)
+    __verbose_print(usage_output_raw, level=Verbosity.DEBUG2)
+
+    usage_qos_idx = lines.index('QOS Records')
+
+    # List all qos records shown from scontrol 
+    usage_qos_raw = lines[usage_qos_idx+1:]
+
+    if len(usage_qos_raw) < 1:
+        # Nothing to do
+        return
+
+    usage = []
+    for line in usage_qos_raw:
+        record = line.split(' ')
+        account_idx = record.index('Account')
+
+        qos_configs = record[:account_idx]
+
+        configs = [x.split('=', 1) for x in qos_configs]
+        configs = {x[0]: x[1] if len(x) == 2 else '' for x in configs}
+
+        if configs['QOS'] != '':
+            qos_idx = configs['QOS'].index('(') 
+            qos_name = configs['QOS'][:qos_idx]
+
+        if configs['GrpTRESMins'] != '':
+            grp_tres_min = [x.split('=') for x in configs['GrpTRESMins'].split(',')]
+            grp_tres_min = {x[0]:x[1].replace(')','').split('(') for x in grp_tres_min}
+            for k in grp_tres_min:
+                grp_tres_min[k] = {'limit': 'N' if grp_tres_min[k][0] == 'N' else int(grp_tres_min[k][0]), 'used': int(grp_tres_min[k][1])}
+
+        if grp_tres_min['billing']['limit'] == 'N':    
+            usage.append({
+                "account": qos_name,
+                "su_used": grp_tres_min['billing']['used'],
+                "su_limit": 'unlimited',
+                "su_remaining": '-',
+                "percent_used": '-',
+                "percent_remaining": '-'
+            })
+        else:
+            u = {
+                "account": qos_name,
+                "su_used": int(grp_tres_min['billing']['used'] / SU_FACTOR),
+                "su_limit":  int(grp_tres_min['billing']['limit'] / SU_FACTOR),
+                "su_remaining":  int((grp_tres_min['billing']['limit'] - grp_tres_min['billing']['used']) / SU_FACTOR),
+                "su_used_raw": int(grp_tres_min['billing']['used'] / SU_FACTOR),
+                "su_limit_raw":  int(grp_tres_min['billing']['limit'] / SU_FACTOR),
+                "su_remaining_raw":  int((grp_tres_min['billing']['limit'] - grp_tres_min['billing']['used']) / SU_FACTOR),
+                "percent_used": float(grp_tres_min['billing']['used']) / grp_tres_min['billing']['limit']
+            }
+            u['percent_remaining'] = 1.0 - u['percent_used']
+            usage.append(u)
+    
+    __verbose_print(usage, level=Verbosity.DEBUG)
+
+    return usage
+
 def main():
     args = parse_args()  
 
+    # Update verbose printing fuction
     if args.verbose:
         def verbose_print(*a, **k):
             if k.pop('level', 0) <= args.verbose:
-                pprint(*a, **k)
+                print(*a, **k)
     else:
         verbose_print = lambda *a, **k: None
 
@@ -97,112 +220,42 @@ def main():
         su_factor = 1
 
     user = getpass.getuser()
-    
-    qos_cmd = [SACCTMGR_COMMAND,'show', 'qos','-P',
-               'format=' + ','.join(SACCTMGR_QOS_FIELDS)
-    ]
-    qos_output_raw = subprocess.check_output(qos_cmd).decode('utf-8')
-    qos = pd.read_csv(StringIO(qos_output_raw), sep='|')
-    qos['GrpTRESMins'] = qos['GrpTRESMins'].apply(lambda tres: {k:int(v) for k,v in (x.split('=') for x in tres.strip().split(','))} if not pd.isnull(tres) else tres)
-    qos['Allocation'] = qos['GrpTRESMins'].apply(lambda x: x['billing'] if not pd.isnull(x) else 'unlimited')
-    
-    # Remove non-accountable QoS
-    qos = qos.loc[qos['Flags'] == 'NoDecay']
+    __verbose_print("User:     " + user, level=Verbosity.INFO)
 
-    assoc_cmd = [SACCTMGR_COMMAND,
-                   'show', 'assoc','-P',
-                   'format=' + ','.join(SACCTMGR_ASSOC_FIELDS)
-    ]
-    # Assume user only have one QoS
-    assoc_output_raw = subprocess.check_output(assoc_cmd).decode('utf-8')
-    assoc = pd.read_csv(StringIO(assoc_output_raw), sep='|')
-    valid_account = assoc.loc[assoc['User'].notnull()]['QOS'].unique()
+    # List accountable QoS    
+    qos = get_slurm_qos()
 
-    # Query account usage
-    usage_cmd = [SACCT_COMMAND,
-                 '-aPX', '--noconvert',
-                 '--format=' + ','.join(SACCT_USAGE_FIELDS),
-                 '--start=' + args.start                             # Start from the begining of service 
-    ]
-    usage_cmd.append('-q')
-    usage_cmd.append(','.join(valid_account))
+    # List user accounts and associations
+    def_qos = get_slurm_default_qos()
 
-    usage_output_raw = subprocess.check_output(usage_cmd).decode('utf-8')
-    usage = pd.read_csv(StringIO(usage_output_raw), sep='|')
-    usage['AllocTRES'] = usage['AllocTRES'].apply(lambda tres: {k:int(v.replace('M','')) for k,v in (x.split('=') for x in tres.strip().split(','))} if not pd.isnull(tres) else tres)
-    usage['ElapsedRaw'] = usage['ElapsedRaw'].apply(lambda x: x / 60.0 if not pd.isnull(x) else x)
-    usage['Billing'] = usage.apply(lambda r: r['AllocTRES'].get(u'billing', 0) * r['ElapsedRaw'] if not pd.isnull(r['AllocTRES']) else 0, axis=1)
-    
-    account_usage = usage.groupby(['Account'], as_index=False).agg({'Billing':'sum'})
-    
-    if args.detail:
-        account_usage = usage.groupby(['Account', 'User'], as_index=False).agg({'Billing':'sum'})
-        
-    qos = qos.rename(columns={'Name': 'Account'})
+    # Get billings usage from scontrol command
+    usage = get_slurm_usage(def_qos)
 
-    result = pd.merge(qos, account_usage, on='Account', how='outer', sort=True)
-    result = result.drop(columns=['GrpTRESMins', 'Flags'])
-    result = result.rename(columns={'Billing': 'Used', 'Descr': 'Description'})
-    
-    if args.detail:
-        result['User'] = result['User'].fillna('')
-
-    result['Used'.format(su_units)] = result['Used'].apply(lambda x: 0 if pd.isnull(x) else int(math.ceil(x)))
-    result['Used({})'.format(su_units)] = result['Used'].apply(lambda x: 0 if pd.isnull(x) else int(math.ceil(x)) * su_factor)
-    result['Allocation({})'.format(su_units)] = result['Allocation'].apply(lambda x: 0 if pd.isnull(x) else x * su_factor)
-    result['Remaining'] = result.apply(lambda r: (r['Allocation'] - r['Used']) if not type(r['Allocation']) is str else '' ,axis=1)
-    result['Remaining({})'.format(su_units)] = result['Remaining'].apply(lambda x: 0 if pd.isnull(x) else x * su_factor)
-    result['Remaining(%)'] = result.apply(lambda r: float(r['Remaining'])/r['Allocation']*100.0 if not type(r['Allocation']) is str else '' ,axis=1)
-    result = result.loc[result['Account'].isin(valid_account)]
-
-    pd.set_option('display.max_rows', None)
-    pd.options.display.float_format = '{:.2f}'.format
-    
-    if args.detail:
-        result['Used(%)'] = result.apply(lambda r: float(r['Used'])/r['Allocation']*100  if not type(r['Allocation']) is str else '' ,axis=1)
-        table = pd.pivot_table(result, values=['Used({})'.format(su_units), 'Used(%)'], index=['Account', 'User'])
-
-        if args.format == 'table':
-            lines = table.to_string(col_space=12, formatters={'Used(%)':'{:.2f}'.format}).split('\n')
-            lines.insert(2, '-'*len(lines[0]))
-            if args.output:
-                with open(args.output, 'w') as f:
-                    f.write('\n'.join(lines))
-                    f.write('\n')
+    if args.format == 'table':
+        header = "{:<10} {:<12} {:>14} {:>12} {:>12} {:>12}".format("Account","Description", "Allocation(SU)","Remaining(SU)","Remaining(%)","Used(SU)")
+        print()
+        print(header)
+        print('-' * len(header))
+        for u in usage:
+            if u['su_limit'] == 'unlimited':
+                print("{:<10} {:<12} {:>14} {:>12} {:>12} {:>12}".format(
+                    u['account'], 
+                    qos[u['account']]['Descr'], 
+                    u['su_limit'],
+                    u['su_remaining'], 
+                    u['percent_remaining'],
+                    u['su_used'])
+                )
             else:
-                print()
-                print('\n'.join(lines))
-                print()
-
-        elif args.format == 'csv':
-            if args.output:
-                table.to_csv(args.output)
-            else:
-                print(table.to_csv())
-        elif args.format == 'json':
-            if args.output:
-                table.to_json(args.output, orient='table')
-            else:
-                print(table.to_json(orient='table'))
-    else:
-        if args.format == 'table':
-            lines = result.to_string(index=False, columns=['Account', 'Description', 'Allocation({})'.format(su_units), 'Remaining({})'.format(su_units), 'Remaining(%)', 'Used({})'.format(su_units)], col_space=12).split('\n')
-            lines.insert(1, '-'*len(lines[0]))
-            if args.output:
-                with open(args.output, 'w') as f:
-                    f.write('\n'.join(lines))
-                    f.write('\n')
-            else:
-                print()
-                print('\n'.join(lines))
-                print()
-        elif args.format == 'csv':
-            if args.output:
-                result.to_csv(args.output, index=False)
-            else:            
-                print(result.to_csv(index=False))
-        elif args.format == 'json':
-            if args.output:
-                result.to_json(args.output, index=False, orient='table')
-            else:
-                print(result.to_json(index=False, orient='table'))
+                print("{:<10} {:<12} {:>14} {:>12} {:>12.2%} {:>12}".format(
+                    u['account'],
+                    qos[u['account']]['Descr'],
+                    u['su_limit'],
+                    u['su_remaining'],
+                    u['percent_remaining'],
+                    u['su_used'])
+                )
+        print()
+    elif args.format == 'json':
+        j = json.dumps(usage)
+        print(j)
