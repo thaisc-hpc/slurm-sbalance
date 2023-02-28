@@ -6,8 +6,6 @@ from .utils import VerboseLog, Verbosity
 
 DEBUG = False
 
-SU_FACTOR = 60
-
 SINFO_CMD = 'sinfo'
 
 SACCT_CLI = 'sacct'
@@ -25,16 +23,21 @@ SACCTMGR_ASSOC_FIELDS = ('account','user','qos', 'defaultqos')
 
 SCONTROL_CLI = 'scontrol'
 
-class Slurm:
-    def __init__(self):
-        pass
+SU_UNLIMITED = 'unlimited'
 
-    def get_slurm_qos(self) -> dict:
+SU_COMPUTE_NODE_FACTOR = 128 * 1 * 60
+SU_GPU_NODE_FACTOR = 4 * 112  * 60
+SU_MEMORY_NODE_FACTOR = 128 * 4.5 * 60
+
+class Slurm:
+
+    @classmethod
+    def get_qos(cls) -> dict:
         """get_slurm_qos returns a dictionary containing QoS data."""
         qos_cmd = [SACCTMGR_CLI,'show', 'qos','-P',
                 'format=' + ','.join(SACCTMGR_QOS_FIELDS)
         ]
-        VerboseLog.print("QoS command: " + ' '.join(qos_cmd), level=Verbosity.DEBUG)
+        VerboseLog.print("Get QoS command: " + ' '.join(qos_cmd), level=Verbosity.DEBUG)
 
         qos_output_raw = subprocess.check_output(qos_cmd).decode('utf-8')
         VerboseLog.print("QoS output:\n" + qos_output_raw, level=Verbosity.DEBUG2)
@@ -58,16 +61,17 @@ class Slurm:
 
         return qos
 
-    def get_slurm_default_qos(self) -> set:
+    @classmethod
+    def get_default_qos(cls) -> set:
         """get_slurm_default_qos returns a set of defualt QoS visible by the user"""
         assoc_cmd = [SACCTMGR_CLI,
                     'show', 'assoc','-P',
                     'format=' + ','.join(SACCTMGR_ASSOC_FIELDS)
         ]
-        VerboseLog.print("Assoc command: " + ' '.join(assoc_cmd), level=Verbosity.DEBUG)
+        VerboseLog.print("Get Association command: " + ' '.join(assoc_cmd), level=Verbosity.DEBUG)
 
         assoc_output_raw = subprocess.check_output(assoc_cmd).decode('utf-8')
-        VerboseLog.print("Assoc output:\n" + assoc_output_raw, level=Verbosity.DEBUG2)
+        VerboseLog.print("Association output:\n" + assoc_output_raw, level=Verbosity.DEBUG2)
 
         assoc_csv = csv.DictReader(StringIO(assoc_output_raw),delimiter='|')
 
@@ -76,18 +80,20 @@ class Slurm:
         for row in assoc_csv:
             if row['Def QOS'] != '' and row['User'] != '':
                 account_set.add(row['Def QOS'])
-        VerboseLog.print("Accounts: " + ','.join(account_set), level=Verbosity.INFO)
-
         return account_set
 
-    def get_slurm_usage(self) -> list:
+    @classmethod
+    def get_usage(cls) -> list:
         """get_slurm_usage returns a list of dictionaries containing usage information for each QoS in `qos_list`"""
 
+        qos = cls.get_qos()
+
         # List user accounts and associations
-        qos_list = self.get_default_qos()
+        qos_list = cls.get_default_qos()
+        VerboseLog.print("Accounts: " + ','.join(qos_list), level=Verbosity.INFO)
 
         usage_cmd = [SCONTROL_CLI,'show', 'assoc','qos='+','.join(qos_list), '-o']
-        VerboseLog.print("Usage command: " + ' '.join(usage_cmd), level=Verbosity.DEBUG)
+        VerboseLog.print("Get Usage command: " + ' '.join(usage_cmd), level=Verbosity.DEBUG)
 
         usage_output_raw = subprocess.check_output(usage_cmd).decode('utf-8')
 
@@ -124,29 +130,28 @@ class Slurm:
                 for k in grp_tres_min:
                     grp_tres_min[k] = {'limit': 'N' if grp_tres_min[k][0] == 'N' else int(grp_tres_min[k][0]), 'used': int(grp_tres_min[k][1])}
 
+            qos_usage = {
+                "account": qos_name,
+                "description": qos[qos_name]['Descr'],
+                "su_used_raw": grp_tres_min['billing']['used']
+            }
+
             if grp_tres_min['billing']['limit'] == 'N':    
-                usage.append({
-                    "account": qos_name,
-                    "su_used": grp_tres_min['billing']['used'],
-                    "su_limit": 'unlimited',
-                    "su_remaining": '-',
-                    "percent_used": '-',
-                    "percent_remaining": '-'
-                })
+                qos_usage["su_alloc_raw"] = SU_UNLIMITED
+                qos_usage["su_remaining_raw"] = '-'
+                qos_usage["percent_used"] = '-'
+                qos_usage["percent_remaining"] = '-'
             else:
-                u = {
-                    "account": qos_name,
-                    "su_used": int(grp_tres_min['billing']['used'] / SU_FACTOR),
-                    "su_limit":  int(grp_tres_min['billing']['limit'] / SU_FACTOR),
-                    "su_remaining":  int((grp_tres_min['billing']['limit'] - grp_tres_min['billing']['used']) / SU_FACTOR),
-                    "su_used_raw": int(grp_tres_min['billing']['used'] / SU_FACTOR),
-                    "su_limit_raw":  int(grp_tres_min['billing']['limit'] / SU_FACTOR),
-                    "su_remaining_raw":  int((grp_tres_min['billing']['limit'] - grp_tres_min['billing']['used']) / SU_FACTOR),
-                    "percent_used": float(grp_tres_min['billing']['used']) / grp_tres_min['billing']['limit']
-                }
-                u['percent_remaining'] = 1.0 - u['percent_used']
-                usage.append(u)
+                qos_usage["su_alloc_raw"] = int(grp_tres_min['billing']['limit']) 
+                qos_usage["su_remaining_raw"] = int((grp_tres_min['billing']['limit'] - grp_tres_min['billing']['used']))
+                qos_usage["percent_used"] = float(grp_tres_min['billing']['used']) / grp_tres_min['billing']['limit']
+                qos_usage['percent_remaining'] = 1.0 - qos_usage['percent_used']
+            
+            usage.append(qos_usage)
         
+        usage.sort(key=lambda x: x["account"])
+
+        VerboseLog.print("Usage:", level=Verbosity.DEBUG)
         VerboseLog.print(usage, level=Verbosity.DEBUG)
 
         return usage

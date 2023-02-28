@@ -16,8 +16,42 @@ from .config import __version__, __author__, __license__, SACCT_BEGIN_DATE
 from .utils import VerboseLog, Verbosity
 from .slurm import Slurm
 
+class FieldConfig:
+    def __init__(self, field:str, header:str, size:int, str_disp:str, field_disp:str):
+        self.field = field
+        self.header = header
+        self.size = size
+        self._str_disp = str_disp
+        self._field_disp = field_disp
+
+    @property
+    def str_disp(self) -> str:
+        return self._str_disp % self.size
+    
+    @property
+    def field_disp(self) -> str:
+        return self._field_disp % self.size
+
+FIELD_CONFIGS={
+    "account": FieldConfig(field="account", header="Account", size=10, str_disp="{:<%d}", field_disp="{:<%d}"),
+    "description": FieldConfig(field="description", header="Description", size=12, str_disp= "{:<%d}", field_disp="{:<%d}"),
+    "allocation_raw": FieldConfig(field="su_alloc_raw", header="Allocation(SU)", size=14, str_disp= "{:>%d}", field_disp="{:>%d.2f}"),
+    "remaining_raw": FieldConfig(field="su_remaining_raw", header="Remaining(SU)", size=12, str_disp= "{:>%d}", field_disp="{:>%d.2f}"),
+    "used_raw": FieldConfig(field="su_used_raw", header="Used(SU)", size=12, str_disp= "{:>%d}", field_disp="{:>%d.2f}"),
+    "remaining_percent": FieldConfig(field="percent_remaining", header="Remaining(%)", size=12, str_disp="{:>%d}", field_disp="{:>%d.2%%}")
+}
+
+DISPLAY_FIELDS=[
+    "account",
+    "description",
+    "allocation_raw",
+    "remaining_raw",
+    "remaining_percent",
+    "used_raw"
+]
+
 def parse_args():
-    slurm_version = str(subprocess.check_output([SINFO_CMD, '--version']).decode())
+    slurm_version = str(subprocess.check_output(['sinfo', '--version']).decode())
 
     parser = argparse.ArgumentParser(prog='sbalance', description='Query slurm account balance.')
     version = "sbalance " + __version__ + " with " + slurm_version
@@ -68,38 +102,34 @@ def main():
     user = getpass.getuser()
     VerboseLog.print("User:     " + user, level=Verbosity.INFO)
 
-    slurm = Slurm()
-
-    # List accountable QoS    
-    qos = slurm.get_qos()
-
     # Get billings usage from scontrol command
-    usage = slurm.get_usage()
+    usage = Slurm.get_usage()
 
     if args.format == 'table':
-        header = "{:<10} {:<12} {:>14} {:>12} {:>12} {:>12}".format("Account","Description", "Allocation(SU)","Remaining(SU)","Remaining(%)","Used(SU)")
+        # Build header 
+        header_fields = []
+        header_format = []
+        row_format = []
+        for f in DISPLAY_FIELDS:
+            header_format.append(FIELD_CONFIGS[f].str_disp)
+            header_fields.append(FIELD_CONFIGS[f].header)
+            row_format.append(FIELD_CONFIGS[f].field_disp)
+
+        header = " ".join(header_format).format(*header_fields)
+        row_str = " ".join(header_format)
+        row_field = " ".join(row_format)
         print()
         print(header)
         print('-' * len(header))
         for u in usage:
-            if u['su_limit'] == 'unlimited':
-                print("{:<10} {:<12} {:>14} {:>12} {:>12} {:>12}".format(
-                    u['account'], 
-                    qos[u['account']]['Descr'], 
-                    u['su_limit'],
-                    u['su_remaining'], 
-                    u['percent_remaining'],
-                    u['su_used'])
-                )
+            row_fields = []
+            for f in DISPLAY_FIELDS:
+                row_fields.append(u[FIELD_CONFIGS[f].field])
+            
+            if u['su_alloc_raw'] == 'unlimited':
+                print(row_str.format(*row_fields))
             else:
-                print("{:<10} {:<12} {:>14} {:>12} {:>12.2%} {:>12}".format(
-                    u['account'],
-                    qos[u['account']]['Descr'],
-                    u['su_limit'],
-                    u['su_remaining'],
-                    u['percent_remaining'],
-                    u['su_used'])
-                )
+                print(row_field.format(*row_fields))
         print()
     elif args.format == 'json':
         j = json.dumps(usage)
