@@ -1,5 +1,6 @@
 import subprocess
 import csv
+import math
 
 from io import StringIO
 from .utils import VerboseLog, Verbosity
@@ -24,10 +25,13 @@ SACCTMGR_ASSOC_FIELDS = ('account','user','qos', 'defaultqos')
 SCONTROL_CLI = 'scontrol'
 
 SU_UNLIMITED = 'unlimited'
+SERVICE_HOUR_FACTOR = 7680.0 
 
-SU_COMPUTE_NODE_FACTOR = 128 * 1 * 60
-SU_GPU_NODE_FACTOR = 4 * 112  * 60
-SU_MEMORY_NODE_FACTOR = 128 * 4.5 * 60
+PARTITION_CONFIGS = [
+    {"name":"compute", "factor": 128 * 1 * 60},
+    {"name":"gpu", "factor": 4 * 112 * 60},
+    {"name":"memory", "factor": 128 * 4.5 * 60}
+]
 
 class Slurm:
 
@@ -133,20 +137,33 @@ class Slurm:
             qos_usage = {
                 "account": qos_name,
                 "description": qos[qos_name]['Descr'],
-                "su_used_raw": grp_tres_min['billing']['used']
+                "su_used": grp_tres_min['billing']['used'],
+                "sh_used": (grp_tres_min['billing']['used'] / SERVICE_HOUR_FACTOR)
             }
 
             if grp_tres_min['billing']['limit'] == 'N':    
-                qos_usage["su_alloc_raw"] = SU_UNLIMITED
-                qos_usage["su_remaining_raw"] = '-'
+                qos_usage["su_alloc"] = SU_UNLIMITED
+                qos_usage["su_remaining"] = '-'
                 qos_usage["percent_used"] = '-'
                 qos_usage["percent_remaining"] = '-'
+                for partition in PARTITION_CONFIGS:
+                    qos_usage['su_used'+'_'+partition["name"]] = float(qos_usage["su_used"]) / partition["factor"]
+                    qos_usage['su_alloc'+'_'+partition["name"]] = SU_UNLIMITED
+                    qos_usage['su_remaining'+'_'+partition["name"]] = '-'
+                qos_usage["sh_alloc"] = SU_UNLIMITED
+                qos_usage["sh_remaining"] = '-'
+
             else:
-                qos_usage["su_alloc_raw"] = int(grp_tres_min['billing']['limit']) 
-                qos_usage["su_remaining_raw"] = int((grp_tres_min['billing']['limit'] - grp_tres_min['billing']['used']))
+                qos_usage["su_alloc"] = int(grp_tres_min['billing']['limit']) 
+                qos_usage["su_remaining"] = int((grp_tres_min['billing']['limit'] - grp_tres_min['billing']['used']))
                 qos_usage["percent_used"] = float(grp_tres_min['billing']['used']) / grp_tres_min['billing']['limit']
                 qos_usage['percent_remaining'] = 1.0 - qos_usage['percent_used']
-            
+                for partition in PARTITION_CONFIGS:
+                    qos_usage['su_used'+'_'+partition["name"]] = float(qos_usage["su_used"]) / partition["factor"]
+                    qos_usage['su_alloc'+'_'+partition["name"]] = float(qos_usage["su_alloc"]) / partition["factor"]
+                    qos_usage['su_remaining'+'_'+partition["name"]] = float(qos_usage["su_remaining"]) / partition["factor"]
+                qos_usage["sh_alloc"] = (qos_usage["su_alloc"]/SERVICE_HOUR_FACTOR) 
+                qos_usage["sh_remaining"] = (qos_usage["su_remaining"]/SERVICE_HOUR_FACTOR)
             usage.append(qos_usage)
         
         usage.sort(key=lambda x: x["account"])
