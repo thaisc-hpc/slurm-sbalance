@@ -14,7 +14,7 @@ import sys
 
 from .config import __version__, __author__, __license__, SACCT_BEGIN_DATE
 from .utils import VerboseLog, Verbosity
-from .slurm import *
+from .slurm import Slurm
 
 def parse_args():
     slurm_version = str(subprocess.check_output([SINFO_CMD, '--version']).decode())
@@ -68,14 +68,13 @@ def main():
     user = getpass.getuser()
     VerboseLog.print("User:     " + user, level=Verbosity.INFO)
 
-    # List accountable QoS    
-    qos = get_slurm_qos()
+    slurm = Slurm()
 
-    # List user accounts and associations
-    def_qos = get_slurm_default_qos()
+    # List accountable QoS    
+    qos = slurm.get_qos()
 
     # Get billings usage from scontrol command
-    usage = get_slurm_usage(def_qos)
+    usage = slurm.get_usage()
 
     if args.format == 'table':
         header = "{:<10} {:<12} {:>14} {:>12} {:>12} {:>12}".format("Account","Description", "Allocation(SU)","Remaining(SU)","Remaining(%)","Used(SU)")
