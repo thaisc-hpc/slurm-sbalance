@@ -17,7 +17,6 @@ from .utils import VerboseLog, Verbosity
 from .slurm import Slurm
 from .fields import FIELD_CONFIGS
 
-
 def parse_args():
     slurm_version =str(subprocess.check_output(['sinfo', '--version']).decode())
 
@@ -31,17 +30,19 @@ def parse_args():
     parser.add_argument(
         '-S', '--start', action='store', default=SACCT_BEGIN_DATE, help="starting date")
     parser.add_argument(
-        '-o', '--output', action='store', help="output file")
-    
+        '--output', action='store', help="output file")
+    parser.add_argument(
+        '-o', '--format', help='comma separated list of fields.', type=lambda s: [field for field in s.split(',')])
+
     format_parser =parser.add_argument_group('format', 'output format')
     format_parser.add_argument(
-        '--format', action='store', dest='format', help="output format. Valid options: table, csv, json. Default: table", default='table')
+        '--output-format', action='store', dest='output_format', choices=['table', 'csv', 'json'], help="output format. Default: table", default='table')
     format_parser.add_argument(
-        '-c', '--csv', action='store_const', dest='format', const='csv', help="print output as csv")
+        '-c', '--csv', action='store_const', dest='output_format', const='csv', help="print output as csv")
     format_parser.add_argument(
-        '-t', '--table', action='store_const', dest='format', const='table', help="print output as table")
+        '-t', '--table', action='store_const', dest='output_format', const='table', help="print output as table")
     format_parser.add_argument(
-        '-j', '--json', action='store_const', dest='format', const='json', help="print output as json")
+        '-j', '--json', action='store_const', dest='output_format', const='json', help="print output as json")
     # format_parser.add_argument(
     #     '-k', action='store_const', dest='unit', default='', const='k', help="show output in kSU (1,000 SU)")
     # format_parser.add_argument(
@@ -58,6 +59,16 @@ def main():
     args =parse_args()  
 
     VerboseLog.set_verbose(args.verbose)
+    VerboseLog.print(args, level=Verbosity.DEBUG)
+
+    if args.format != None:
+        for field in args.format:
+            if not field in FIELD_CONFIGS.keys():
+                print('error: Invalid field: "{}"'.format(field))
+                return
+        display_fields = args.format
+    else:
+        display_fields = DEFAULT_DISPLAY_FIELDS
 
     # if args.unit =='k':
     #     su_units ='kSU'
@@ -75,9 +86,7 @@ def main():
     # Get billings usage from scontrol command
     usage =Slurm.get_usage(use_sacct=args.exact)
 
-    if args.format =='table':
-        display_fields = DEFAULT_DISPLAY_FIELDS
-        
+    if args.output_format =='table':
         # Build header 
         header_fields = []
         header_format = []
@@ -125,7 +134,7 @@ def main():
         row_field = " ".join(row_format)
         print()
         if len(topic_fields) > 1:
-            topic_check = topic_fields
+            topic_check = topic_fields.copy()
             topic_check.remove('')
             if len(topic_check) > 1:
                 print(" ".join(topic_format).format(*topic_fields))
@@ -141,6 +150,6 @@ def main():
             else:
                 print(row_field.format(*row_fields))
         print()
-    elif args.format == 'json':
+    elif args.output_format == 'json':
         j = json.dumps(usage)
         print(j)

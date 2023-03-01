@@ -26,9 +26,9 @@ FIELD_CONFIGS={
     "used": FieldConfig(field="sh_used", header="Used(SHr)", size=16, topic="Service Hour", str_disp="{:>%d}", field_disp="{:>%d.2f}"),
 
     # System SU
-    "allocation_system": FieldConfig(field="su_alloc", header="Allocation(SU)", size=14, str_disp="{:>%d}", field_disp="{:>%d.0f}"),
-    "remaining_system": FieldConfig(field="su_remaining", header="Remaining(SU)", size=12, str_disp="{:>%d}", field_disp="{:>%d.0f}"),
-    "used_system": FieldConfig(field="su_used", header="Used(SU)", size=12, str_disp="{:>%d}", field_disp="{:>%d.0f}"),
+    "allocation_system": FieldConfig(field="su_alloc", header="Allocation(SU)", topic="Service Unit", size=14, str_disp="{:>%d}", field_disp="{:>%d.0f}"),
+    "remaining_system": FieldConfig(field="su_remaining", header="Remaining(SU)", topic="Service Unit", size=12, str_disp="{:>%d}", field_disp="{:>%d.0f}"),
+    "used_system": FieldConfig(field="su_used", header="Used(SU)", topic="Service Unit", size=12, str_disp="{:>%d}", field_disp="{:>%d.0f}"),
 
     "remaining_percent": FieldConfig(field="percent_remaining", header="Remaining(%)", size=12, str_disp="{:>%d}", field_disp="{:>%d.2%%}"),
     
