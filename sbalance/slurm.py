@@ -126,7 +126,7 @@ class Slurm:
         return usage_dict
 
     @classmethod
-    def get_usage(cls, use_sacct=False) -> list:
+    def get_usage(cls, use_sacct=False, per_user=False) -> list:
         """get_slurm_usage returns a list of dictionaries containing usage information for each QoS in `qos_list`"""
 
         qos = cls.get_qos()
@@ -198,7 +198,6 @@ class Slurm:
                     qos_usage['su_remaining'+'_'+partition["name"]] = '-'
                 qos_usage["sh_alloc"] = SU_UNLIMITED
                 qos_usage["sh_remaining"] = '-'
-
             else:
                 qos_usage["su_alloc"] = int(grp_tres_min['billing']['limit']) 
                 qos_usage["su_remaining"] = int((grp_tres_min['billing']['limit'] - grp_tres_min['billing']['used']))
@@ -210,8 +209,17 @@ class Slurm:
                     qos_usage['su_remaining'+'_'+partition["name"]] = float(qos_usage["su_remaining"]) / partition["factor"]
                 qos_usage["sh_alloc"] = (qos_usage["su_alloc"]/SERVICE_HOUR_FACTOR) 
                 qos_usage["sh_remaining"] = (qos_usage["su_remaining"]/SERVICE_HOUR_FACTOR)
+            
+            if use_sacct:
+                qos_usage['users'] = []
+                for user in detail_usage[qos_name]:
+                    detail_usage[qos_name][user]['su_used'] = math.ceil(detail_usage[qos_name][user]['billing'])
+                    detail_usage[qos_name][user]['sh_used'] = detail_usage[qos_name][user]['su_used'] /SERVICE_HOUR_FACTOR
+                    detail_usage[qos_name][user]['percent_used'] = float(detail_usage[qos_name][user]['su_used'])/grp_tres_min['billing']['used']
+                    qos_usage['users'].append(detail_usage[qos_name][user])
+                qos_usage['users'].sort(reverse=True,key=lambda x: x['billing'])
+
             usage.append(qos_usage)
-        
         usage.sort(key=lambda x: x["account"])
 
         VerboseLog.print("Usage:", level=Verbosity.DEBUG)

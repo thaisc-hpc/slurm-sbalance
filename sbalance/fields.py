@@ -30,6 +30,7 @@ FIELD_CONFIGS={
     "remaining_system": FieldConfig(field="su_remaining", header="Remaining(SU)", topic="Service Unit", size=12, str_disp="{:>%d}", field_disp="{:>%d.0f}"),
     "used_system": FieldConfig(field="su_used", header="Used(SU)", topic="Service Unit", size=12, str_disp="{:>%d}", field_disp="{:>%d.0f}"),
 
+    "used_percent": FieldConfig(field="percent_used", header="Used(%)", size=12, str_disp="{:>%d}", field_disp="{:>%d.2%%}"),
     "remaining_percent": FieldConfig(field="percent_remaining", header="Remaining(%)", size=12, str_disp="{:>%d}", field_disp="{:>%d.2%%}"),
     
     "allocation_compute": FieldConfig(field="su_alloc_compute",  header="Alloc(Node-Hr)", topic="Compute (Estimated)", size=14, str_disp="{:>%d}", field_disp="{:>%d.2f}"),
@@ -43,4 +44,11 @@ FIELD_CONFIGS={
     "allocation_memory": FieldConfig(field="su_alloc_memory", header="Allocation(Hr)", topic="Memory (Estimated)", size=14, str_disp="{:>%d}", field_disp="{:>%d.2f}"),
     "remaining_memory": FieldConfig(field="su_remaining_memory", header="Remaining(Hr)", topic="Memory (Estimated)", size=14, str_disp="{:>%d}", field_disp="{:>%d.2f}"),
     "used_memory": FieldConfig(field="su_used_memory", header="Used(Hr)", size=14, topic="Memory (Estimated)", str_disp="{:>%d}", field_disp="{:>%d.2f}"),
+}
+
+FIELD_PER_USER_CONFIGS={
+    "account": FieldConfig(field="account", header="Account", size=10, str_disp="{:<%d}", field_disp="{:<%d}"),
+    "user": FieldConfig(field="user", header="User", size=12, str_disp="{:<%d}", field_disp="{:<%d}"),
+    "used_percent": FieldConfig(field="percent_used", header="Used(%)", size=12, str_disp="{:>%d}", field_disp="{:>%d.2%%}"),
+    "used": FieldConfig(field="sh_used", header="Used(SHr)", size=16, topic="Service Hour", str_disp="{:>%d}", field_disp="{:>%d.2f}"),
 }
