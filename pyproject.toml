@@ -1,0 +1,23 @@
+[build-system]
+requires = ["setuptools>=59.6"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "slurm-sbalance"
+version = "0.2.0"
+authors = [
+  { name="Putt Sakdhnagool", email="psakdhna@nectec.or.th" },
+]
+description = "Slurm utility for checking account balance"
+readme = "README.md"
+requires-python = ">=3.6"
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: POSIX :: Linux",
+]
+
+[project.urls]
+"Homepage" = "https://github.com/puttsk/slurm-sbalance/"
+"Bug Tracker" = "https://github.com/puttsk/slurm-sbalance/issues"

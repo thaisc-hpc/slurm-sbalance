@@ -93,6 +93,7 @@ venv.bak/
 venv-system
 venv-python3
 venv3
+venv*
 
 # Spyder project settings
 .spyderproject
