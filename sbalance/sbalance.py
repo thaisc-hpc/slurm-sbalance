@@ -35,7 +35,7 @@ def parse_args():
     
     format_parser =parser.add_argument_group('format', 'output format')
     format_parser.add_argument(
-        '--output', action='store', dest='format', help="output format. Valid options: table, csv, json. Default: table", default='table')
+        '--format', action='store', dest='format', help="output format. Valid options: table, csv, json. Default: table", default='table')
     format_parser.add_argument(
         '-c', '--csv', action='store_const', dest='format', const='csv', help="print output as csv")
     format_parser.add_argument(
@@ -75,7 +75,7 @@ def main():
     # Get billings usage from scontrol command
     usage =Slurm.get_usage(use_sacct=args.exact)
 
-    if args.output =='table':
+    if args.format =='table':
         display_fields = DEFAULT_DISPLAY_FIELDS
         
         # Build header 
