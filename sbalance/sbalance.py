@@ -132,8 +132,9 @@ def main():
                     print(row_field.format(*row_fields))
                     count = count + 1
 
-                print(row_field.format("", "Total", percent_sum, sh_sum))
-                print('-' * len(header))
+                if count > 0:
+                    print(row_field.format("", "Total", percent_sum, sh_sum))
+                    print('-' * len(header))
         else:
             for f in display_fields:
                 if FIELD_CONFIGS[f].topic !=None:

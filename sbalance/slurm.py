@@ -178,7 +178,11 @@ class Slurm:
                     grp_tres_min[k] = {'limit': 'N' if grp_tres_min[k][0] == 'N' else int(grp_tres_min[k][0]), 'used': int(grp_tres_min[k][1])}
 
             if use_sacct:
-                grp_tres_min['billing']['used'] = math.ceil(functools.reduce(lambda val, k: val + detail_usage[qos_name][k]['billing'], detail_usage[qos_name],0))
+                if not qos_name in detail_usage.keys():
+                    # There is no usage from any users
+                    grp_tres_min['billing']['used'] = 0
+                else:
+                    grp_tres_min['billing']['used'] = math.ceil(functools.reduce(lambda val, k: val + detail_usage[qos_name][k]['billing'], detail_usage[qos_name],0))
 
             qos_usage = {
                 "account": qos_name,
@@ -212,12 +216,13 @@ class Slurm:
             
             if use_sacct:
                 qos_usage['users'] = []
-                for user in detail_usage[qos_name]:
-                    detail_usage[qos_name][user]['su_used'] = math.ceil(detail_usage[qos_name][user]['billing'])
-                    detail_usage[qos_name][user]['sh_used'] = detail_usage[qos_name][user]['su_used'] /SERVICE_HOUR_FACTOR
-                    detail_usage[qos_name][user]['percent_used'] = float(detail_usage[qos_name][user]['su_used'])/grp_tres_min['billing']['used']
-                    qos_usage['users'].append(detail_usage[qos_name][user])
-                qos_usage['users'].sort(reverse=True,key=lambda x: x['billing'])
+                if qos_name in detail_usage.keys():    
+                    for user in detail_usage[qos_name]:
+                        detail_usage[qos_name][user]['su_used'] = math.ceil(detail_usage[qos_name][user]['billing'])
+                        detail_usage[qos_name][user]['sh_used'] = detail_usage[qos_name][user]['su_used'] /SERVICE_HOUR_FACTOR
+                        detail_usage[qos_name][user]['percent_used'] = float(detail_usage[qos_name][user]['su_used'])/grp_tres_min['billing']['used']
+                        qos_usage['users'].append(detail_usage[qos_name][user])
+                    qos_usage['users'].sort(reverse=True,key=lambda x: x['billing'])
 
             usage.append(qos_usage)
         usage.sort(key=lambda x: x["account"])

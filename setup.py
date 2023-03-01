@@ -27,22 +27,17 @@ setup(
         'Intended Audience :: System Administrators',
         'Topic :: System :: Systems Administration',
         'License :: OSI Approved :: MIT License',
-        'Programming Language :: Python :: 2',
-        'Programming Language :: Python :: 2.7',
         'Programming Language :: Python :: 3',
         'Programming Language :: Python :: 3.6',
     ],
     keywords='slurm', 
     packages=find_packages(exclude=['contrib', 'docs', 'tests']),
-    python_requires='>=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*, !=3.4.*, !=3.5.*, <4',
+    python_requires='!=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*, !=3.4.*, !=3.5.*, <4',
     entry_points={ 
         'console_scripts': [
             'sbalance=sbalance:main',
         ],
     },
-    install_requires=[
-        'pandas>=0.24',
-    ],
     project_urls={ 
         'Bug Reports': 'https://github.com/puttsk/slurm-sbalance/issues',
         'Source': 'https://github.com/puttsk/slurm-sbalance/',

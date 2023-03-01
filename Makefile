@@ -2,7 +2,7 @@
 
 .PHONY: build
 build: setup.py sbalance/sbalance.py
-	python setup.py sdist bdist_wheel
+	python3 setup.py sdist bdist_wheel
 
 .PHONY: dist
 dist: 
