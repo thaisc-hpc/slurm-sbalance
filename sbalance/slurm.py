@@ -1,10 +1,11 @@
 import subprocess
 import csv
 import math
+import functools
 
 from io import StringIO
 from .utils import VerboseLog, Verbosity
-
+from .config import SACCT_BEGIN_DATE
 DEBUG = False
 
 SINFO_CMD = 'sinfo'
@@ -87,7 +88,45 @@ class Slurm:
         return account_set
 
     @classmethod
-    def get_usage(cls) -> list:
+    def get_detail_usage(cls, qos=None) -> list:
+        usage_cmd = [SACCT_CLI,'-aXP', '--noconvert', '-o', ','.join(SACCT_USAGE_FIELDS), '-S', SACCT_BEGIN_DATE]
+        if qos != None:
+            usage_cmd.append("-q") 
+            usage_cmd.append(','.join(qos)) 
+        VerboseLog.print("Get Detail Usage command: " + ' '.join(usage_cmd), level=Verbosity.DEBUG)
+        
+        usage_output_raw = subprocess.check_output(usage_cmd).decode('utf-8')
+        usage_csv = csv.DictReader(StringIO(usage_output_raw),delimiter='|')
+        VerboseLog.print("Detail Usage output:", level=Verbosity.DEBUG)
+
+        usage_dict = {}
+
+        for row in usage_csv:
+            alloc_tres = row['AllocTRES'].split(',')
+            res_dict = dict()
+            for res in alloc_tres:
+                r = res.split('=')
+                if len(r) == 2:
+                    if r[0] == 'billing':
+                        res_dict[r[0]] = int(r[1])
+                    else:
+                        res_dict[r[0]] = r[1]
+            row['AllocTRES'] = res_dict
+            row['ElapsedRaw'] = int(row['ElapsedRaw'])
+
+            if row['ElapsedRaw'] > 0:
+                row['billing'] = row['AllocTRES']['billing'] * row['ElapsedRaw'] / 60.0
+                if not row['QOS'] in usage_dict.keys():
+                    usage_dict[row['QOS']] = {}
+                if not row['User'] in usage_dict[row['QOS']].keys():
+                    usage_dict[row['QOS']][row['User']] = {'user': row['User'], 'account': row['Account'], 'billing':0}
+                usage_dict[row['QOS']][row['User']]['billing'] += row['billing']
+        
+        VerboseLog.print(usage_dict, level=Verbosity.DEBUG)
+        return usage_dict
+
+    @classmethod
+    def get_usage(cls, use_sacct=False) -> list:
         """get_slurm_usage returns a list of dictionaries containing usage information for each QoS in `qos_list`"""
 
         qos = cls.get_qos()
@@ -96,6 +135,10 @@ class Slurm:
         qos_list = cls.get_default_qos()
         VerboseLog.print("Accounts: " + ','.join(qos_list), level=Verbosity.INFO)
 
+        if use_sacct:
+            # Get detailed usage
+            detail_usage = cls.get_detail_usage(qos=qos_list)
+        
         usage_cmd = [SCONTROL_CLI,'show', 'assoc','qos='+','.join(qos_list), '-o']
         VerboseLog.print("Get Usage command: " + ' '.join(usage_cmd), level=Verbosity.DEBUG)
 
@@ -133,6 +176,9 @@ class Slurm:
                 grp_tres_min = {x[0]:x[1].replace(')','').split('(') for x in grp_tres_min}
                 for k in grp_tres_min:
                     grp_tres_min[k] = {'limit': 'N' if grp_tres_min[k][0] == 'N' else int(grp_tres_min[k][0]), 'used': int(grp_tres_min[k][1])}
+
+            if use_sacct:
+                grp_tres_min['billing']['used'] = math.ceil(functools.reduce(lambda val, k: val + detail_usage[qos_name][k]['billing'], detail_usage[qos_name],0))
 
             qos_usage = {
                 "account": qos_name,
