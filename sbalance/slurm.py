@@ -115,12 +115,13 @@ class Slurm:
             row['ElapsedRaw'] = int(row['ElapsedRaw'])
 
             if row['ElapsedRaw'] > 0:
-                row['billing'] = row['AllocTRES']['billing'] * row['ElapsedRaw'] / 60.0
-                if not row['QOS'] in usage_dict.keys():
-                    usage_dict[row['QOS']] = {}
-                if not row['User'] in usage_dict[row['QOS']].keys():
-                    usage_dict[row['QOS']][row['User']] = {'user': row['User'], 'account': row['Account'], 'billing':0}
-                usage_dict[row['QOS']][row['User']]['billing'] += row['billing']
+                if "billing" in row['AllocTRES'].keys():
+                    row['billing'] = row['AllocTRES']['billing'] * row['ElapsedRaw'] / 60.0
+                    if not row['QOS'] in usage_dict.keys():
+                        usage_dict[row['QOS']] = {}
+                    if not row['User'] in usage_dict[row['QOS']].keys():
+                        usage_dict[row['QOS']][row['User']] = {'user': row['User'], 'account': row['Account'], 'billing':0}
+                    usage_dict[row['QOS']][row['User']]['billing'] += row['billing']
         
         VerboseLog.print(usage_dict, level=Verbosity.DEBUG)
         return usage_dict
