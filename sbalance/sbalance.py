@@ -33,16 +33,24 @@ def parse_args():
         '--output', action='store', help="output file")
     parser.add_argument(
         '-o', '--format', help='comma separated list of fields.', type=lambda s: [field for field in s.split(',')])
+    parser.add_argument(
+        '--estimate', action='store', dest='estimate', choices=['compute', 'gpu', 'memory'], help="show estimated allocation and remaining usage for nodes in the specified partition")
+    parser.add_argument(
+        '-c', '--compute', help='show estimated allocation and remaining usage for compute nodes', action='store_const', dest="estimate", const="compute")
+    parser.add_argument(
+        '-g', '--gpu', help='show estimated allocation and remaining usage for GPU nodes', action='store_const', dest="estimate", const="gpu")
+    parser.add_argument(
+        '-m', '--memory', help='show estimated allocation and remaining usage for memory nodes', action='store_const', dest="estimate", const="memory")
 
     format_parser =parser.add_argument_group('format', 'output format')
     format_parser.add_argument(
         '--output-format', action='store', dest='output_format', choices=['table', 'csv', 'json'], help="output format. Default: table", default='table')
     format_parser.add_argument(
-        '-c', '--csv', action='store_const', dest='output_format', const='csv', help="print output as csv")
+        '--csv', action='store_const', dest='output_format', const='csv', help="print output as csv")
     format_parser.add_argument(
-        '-t', '--table', action='store_const', dest='output_format', const='table', help="print output as table")
+        '--table', action='store_const', dest='output_format', const='table', help="print output as table")
     format_parser.add_argument(
-        '-j', '--json', action='store_const', dest='output_format', const='json', help="print output as json")
+        '--json', action='store_const', dest='output_format', const='json', help="print output as json")
     # format_parser.add_argument(
     #     '-k', action='store_const', dest='unit', default='', const='k', help="show output in kSU (1,000 SU)")
     # format_parser.add_argument(
@@ -73,6 +81,16 @@ def main():
         display_fields = args.format
     else:
         display_fields = DEFAULT_DISPLAY_FIELDS
+
+    if args.estimate == "compute":
+        display_fields.append("allocation_compute")
+        display_fields.append("remaining_compute")
+    elif args.estimate == "gpu":
+        display_fields.append("allocation_gpu")
+        display_fields.append("remaining_gpu")
+    elif args.estimate == "memory":
+        display_fields.append("allocation_memory")
+        display_fields.append("remaining_memory")
 
     # if args.unit =='k':
     #     su_units ='kSU'

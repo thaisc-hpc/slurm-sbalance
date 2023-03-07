@@ -33,17 +33,17 @@ FIELD_CONFIGS={
     "used_percent": FieldConfig(field="percent_used", header="Used(%)", size=12, str_disp="{:>%d}", field_disp="{:>%d.2%%}"),
     "remaining_percent": FieldConfig(field="percent_remaining", header="Remaining(%)", size=12, str_disp="{:>%d}", field_disp="{:>%d.2%%}"),
     
-    "allocation_compute": FieldConfig(field="su_alloc_compute",  header="Alloc(Node-Hr)", topic="Compute (Estimated)", size=14, str_disp="{:>%d}", field_disp="{:>%d.2f}"),
-    "remaining_compute": FieldConfig(field="su_remaining_compute", header="Remain(Node-Hr)", topic="Compute (Estimated)", size=14, str_disp="{:>%d}", field_disp="{:>%d.2f}"),
-    "used_compute": FieldConfig(field="su_used_compute", header="Used(Node-Hr)", topic="Compute (Estimated)", size=14, str_disp="{:>%d}", field_disp="{:>%d.2f}"),
+    "allocation_compute": FieldConfig(field="su_alloc_compute",  header="Alloc(Node-Hr)", topic="Compute (Estimated)", size=16, str_disp="{:>%d}", field_disp="{:>%d.2f}"),
+    "remaining_compute": FieldConfig(field="su_remaining_compute", header="Remain(Node-Hr)", topic="Compute (Estimated)", size=16, str_disp="{:>%d}", field_disp="{:>%d.2f}"),
+    "used_compute": FieldConfig(field="su_used_compute", header="Used(Node-Hr)", topic="Compute (Estimated)", size=16, str_disp="{:>%d}", field_disp="{:>%d.2f}"),
     
-    "allocation_gpu": FieldConfig(field="su_alloc_gpu", header="Alloc(Node-Hr)", topic="GPU (Estimated)", size=14, str_disp="{:>%d}", field_disp="{:>%d.2f}"),
-    "remaining_gpu": FieldConfig(field="su_remaining_gpu", header="Remain(Node-Hr)", topic="GPU (Estimated)", size=14, str_disp="{:>%d}", field_disp="{:>%d.2f}"),
-    "used_gpu": FieldConfig(field="su_used_gpu", header="Used(Node-Hr)", topic="GPU (Estimated)", size=14, str_disp="{:>%d}", field_disp="{:>%d.2f}"),
+    "allocation_gpu": FieldConfig(field="su_alloc_gpu", header="Alloc(Node-Hr)", topic="GPU (Estimated)", size=16, str_disp="{:>%d}", field_disp="{:>%d.2f}"),
+    "remaining_gpu": FieldConfig(field="su_remaining_gpu", header="Remain(Node-Hr)", topic="GPU (Estimated)", size=16, str_disp="{:>%d}", field_disp="{:>%d.2f}"),
+    "used_gpu": FieldConfig(field="su_used_gpu", header="Used(Node-Hr)", topic="GPU (Estimated)", size=16, str_disp="{:>%d}", field_disp="{:>%d.2f}"),
     
-    "allocation_memory": FieldConfig(field="su_alloc_memory", header="Allocation(Hr)", topic="Memory (Estimated)", size=14, str_disp="{:>%d}", field_disp="{:>%d.2f}"),
-    "remaining_memory": FieldConfig(field="su_remaining_memory", header="Remaining(Hr)", topic="Memory (Estimated)", size=14, str_disp="{:>%d}", field_disp="{:>%d.2f}"),
-    "used_memory": FieldConfig(field="su_used_memory", header="Used(Hr)", size=14, topic="Memory (Estimated)", str_disp="{:>%d}", field_disp="{:>%d.2f}"),
+    "allocation_memory": FieldConfig(field="su_alloc_memory", header="Allocation(Hr)", topic="Memory (Estimated)", size=16, str_disp="{:>%d}", field_disp="{:>%d.2f}"),
+    "remaining_memory": FieldConfig(field="su_remaining_memory", header="Remaining(Hr)", topic="Memory (Estimated)", size=16, str_disp="{:>%d}", field_disp="{:>%d.2f}"),
+    "used_memory": FieldConfig(field="su_used_memory", header="Used(Hr)", size=16, topic="Memory (Estimated)", str_disp="{:>%d}", field_disp="{:>%d.2f}"),
 }
 
 FIELD_PER_USER_CONFIGS={
