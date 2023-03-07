@@ -83,13 +83,13 @@ def main():
         display_fields = DEFAULT_DISPLAY_FIELDS
 
     if args.estimate == "compute":
-        display_fields.append("allocation_compute")
+        #display_fields.append("allocation_compute")
         display_fields.append("remaining_compute")
     elif args.estimate == "gpu":
-        display_fields.append("allocation_gpu")
+        #display_fields.append("allocation_gpu")
         display_fields.append("remaining_gpu")
     elif args.estimate == "memory":
-        display_fields.append("allocation_memory")
+        #display_fields.append("allocation_memory")
         display_fields.append("remaining_memory")
 
     # if args.unit =='k':

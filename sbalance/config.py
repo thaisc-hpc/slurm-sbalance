@@ -9,6 +9,6 @@ DEFAULT_DISPLAY_FIELDS=[
     "description",
     "remaining_percent",
     "allocation",
+    "used",
     "remaining",
-    "used"
 ]
