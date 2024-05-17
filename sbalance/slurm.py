@@ -30,8 +30,8 @@ SERVICE_HOUR_FACTOR = 7680.0
 
 PARTITION_CONFIGS = [
     {"name":"compute", "factor": 128 * 1 * 60},
-    {"name":"gpu", "factor": 4 * 112 * 60},
-    {"name":"memory", "factor": 128 * 4.5 * 60}
+    {"name":"gpu", "factor": 4 * 96 * 60},
+    {"name":"memory", "factor": 128 * 4 * 60}
 ]
 
 class Slurm:
